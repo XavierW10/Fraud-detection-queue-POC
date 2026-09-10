@@ -173,6 +173,32 @@ describe('above-threshold case', () => {
     const [, all] = await api.approvals();
     expect(all.approvals).toHaveLength(2);
   });
+
+  it('will not be closed around a request the senior queue is still holding', async () => {
+    const kase = newFlaggedCase('ACC-2004');
+
+    actAs(senior());
+    const [, opened] = await api.claim(kase.id, kase.version);
+    const [, sent] = await api.requestApproval(kase.id, {
+      expectedVersion: opened.case.version,
+      recommendedResolution: 'confirm_fraud',
+      requesterReason: 'Raising it for a second signature.',
+    });
+
+    const [refused, refusal] = await api.decide(kase.id, {
+      expectedVersion: sent.case.version,
+      resolution: 'confirmed_fraud',
+      rationale: 'Closing it myself instead.',
+    });
+    expect([refused, refusal.error.code]).toEqual([409, 'conflict']);
+
+    // The request is still decidable, which it would not be against a closed case.
+    const [, still] = await api.case(kase.id);
+    expect([still.case.status, still.approvals[0].approval.status]).toEqual([
+      'escalated',
+      'pending',
+    ]);
+  });
 });
 
 describe('closed case', () => {

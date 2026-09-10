@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { insertAuditEvent } from '@/db/audit';
 import type { Db, DbLike } from '@/db/client';
 import {
@@ -102,6 +102,7 @@ export function resolveCase(db: Db, input: ResolveInput): Case {
     const kase = loadCase(tx, input.caseId);
     assertVersion('Case', kase.version, input.expectedVersion);
     assertPermitted('resolve', { actor: input.actor, case: kase });
+    assertNoPendingApproval(tx, kase);
     return closeCase(tx, {
       kase,
       actor: input.actor,
@@ -237,6 +238,24 @@ function closeCase(
   });
   setAccountStatus(tx, kase, actor.id, ACCOUNT_STATUS_FOR_RESOLUTION[resolution]);
   return closed;
+}
+
+/**
+ * A pending request owns the outcome: closing the case around it would leave
+ * the request in the senior's queue against a case that can no longer move.
+ */
+function assertNoPendingApproval(tx: DbLike, kase: Case): void {
+  const pending = tx
+    .select({ id: approvals.id })
+    .from(approvals)
+    .where(and(eq(approvals.caseId, kase.id), eq(approvals.status, 'pending')))
+    .get();
+  if (!pending) return;
+
+  throw new WorkflowError(
+    'conflict',
+    'An approval request is pending on this case; it is decided through the approval, not directly',
+  );
 }
 
 function loadCase(tx: DbLike, caseId: string): Case {

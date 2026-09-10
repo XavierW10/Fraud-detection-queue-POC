@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 import { caseApi } from '@/api/client';
-import { CASE_STATUS_LABELS } from '@/components/labels';
+import { CASE_STATUS_LABELS, ruleLabel } from '@/components/labels';
 import { CASE_STATUSES } from '@/db/schema';
 import {
   filterAndSort,
@@ -26,7 +26,13 @@ export function QueueTable({ rows, currentUserId }: { rows: QueueRow[]; currentU
   const only = <K extends keyof QueueFilters>(key: K, value: QueueFilters[K]) =>
     setFilters({ ...NO_FILTERS, [key]: value });
 
-  const ruleOptions = useMemo(() => [...new Set(rows.flatMap((row) => row.rules))].sort(), [rows]);
+  const ruleOptions = useMemo(
+    () =>
+      [...new Set(rows.flatMap((row) => row.rules))].sort((a, b) =>
+        ruleLabel(a).localeCompare(ruleLabel(b)),
+      ),
+    [rows],
+  );
   const visible = useMemo(
     () => filterAndSort(rows, filters, currentUserId),
     [rows, filters, currentUserId],
@@ -102,7 +108,7 @@ export function QueueTable({ rows, currentUserId }: { rows: QueueRow[]; currentU
             <option value="all">Any</option>
             {ruleOptions.map((value) => (
               <option key={value} value={value}>
-                {value}
+                {ruleLabel(value)}
               </option>
             ))}
           </select>
@@ -184,7 +190,7 @@ export function QueueTable({ rows, currentUserId }: { rows: QueueRow[]; currentU
                   <span className="text-slate-400">—</span>
                 )}
               </Td>
-              <Td className="text-slate-600">{row.rules.join(', ') || '—'}</Td>
+              <Td className="text-slate-600">{row.rules.map(ruleLabel).join(', ') || '—'}</Td>
               <Td>{CASE_STATUS_LABELS[row.status]}</Td>
               <Td className={row.assigneeName ? '' : 'text-slate-400'}>
                 {row.assigneeName ?? 'Unassigned'}

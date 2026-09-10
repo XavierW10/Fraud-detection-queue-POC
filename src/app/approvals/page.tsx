@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getCurrentUser } from '@/auth/currentUser';
 import { CaseActions } from '@/components/CaseActions';
 import { caseReference, formatDuration } from '@/components/format';
-import { RECOMMENDATION_LABELS } from '@/components/labels';
+import { RECOMMENDATION_LABELS, ruleLabel } from '@/components/labels';
 import { getDb } from '@/db/client';
 import { listApprovals } from '@/workflow/queries';
 
@@ -43,7 +43,7 @@ export default async function ApprovalsPage() {
               <span className="text-slate-500">
                 {row.triggeredRules
                   .filter((rule) => rule.triggered)
-                  .map((rule) => rule.id)
+                  .map((rule) => ruleLabel(rule.id))
                   .join(', ') || 'no rules triggered'}
               </span>
               <span className="ml-auto whitespace-nowrap text-slate-500">
