@@ -1,0 +1,29 @@
+# Source of truth for fraud rule definitions. Never persisted to the database:
+# cases store only the evaluation outcome (riskScore, triggeredRules, policyVersion).
+policyId: aml-transaction-monitoring-policy
+name: AML Transaction Monitoring Policy
+policyVersion: 1.0.0
+escalationThreshold: 60
+
+rules:
+  structuring:
+    enabled: true
+    weight: 45
+    minTransactions: 3
+    minAmount: 8000
+    maxAmount: 9999
+    windowHours: 72
+
+  geoImpossibility:
+    enabled: true
+    weight: 35
+    maxKmPerHour: 800
+    earthRadiusKm: 6371
+
+  sharedDeviceLinkage:
+    enabled: true
+    weight: 40
+    # accounts.status values that make a linked account suspicious
+    linkedAccountStatuses:
+      - flagged
+      - confirmed_fraud
