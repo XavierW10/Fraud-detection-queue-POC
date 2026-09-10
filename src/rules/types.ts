@@ -42,6 +42,9 @@ export const RULE_IDS = {
   sharedDeviceLinkage: 'shared_device_linkage',
 } as const;
 
+/** The persisted rule ids, the vocabulary a case's `triggeredRules` uses. */
+export type RuleId = (typeof RULE_IDS)[keyof typeof RULE_IDS];
+
 export function byTimestamp(a: EvaluatedTransaction, b: EvaluatedTransaction): number {
   return a.timestamp.getTime() - b.timestamp.getTime();
 }

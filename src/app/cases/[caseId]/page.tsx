@@ -9,6 +9,7 @@ import {
   CASE_STATUS_LABELS,
   RECOMMENDATION_LABELS,
   RESOLUTION_LABELS,
+  ruleLabel,
 } from '@/components/labels';
 import { getDb } from '@/db/client';
 import type { RuleEvidence, TriggeredRule } from '@/db/schema';
@@ -100,7 +101,7 @@ export default async function CasePage({ params }: PageProps<'/cases/[caseId]'>)
           {row.triggeredRules.map((rule) => (
             <li key={rule.id} className="px-3 py-2">
               <div className="flex items-baseline gap-2">
-                <span className="font-medium">{rule.id}</span>
+                <span className="font-medium">{ruleLabel(rule.id)}</span>
                 <span
                   className={
                     rule.triggered
