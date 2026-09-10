@@ -1,5 +1,12 @@
 import { sql, type SQL } from 'drizzle-orm';
-import { check, integer, real, sqliteTable, text, type AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
+import {
+  check,
+  integer,
+  real,
+  sqliteTable,
+  text,
+  type AnySQLiteColumn,
+} from 'drizzle-orm/sqlite-core';
 
 export const USER_ROLES = ['reviewer', 'senior'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
@@ -47,6 +54,8 @@ export const users = sqliteTable(
   'users',
   {
     id: uuid('id'),
+    /** Display name for the "act as" switcher. Staff, not customer, data. */
+    name: text('name').notNull(),
     email: text('email').notNull(),
     role: text('role', { enum: USER_ROLES }).notNull(),
     createdAt: timestamp('created_at').notNull().default(now),

@@ -22,6 +22,13 @@
       "when": 1789007562027,
       "tag": "0002_low_morbius",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789007951391,
+      "tag": "0003_brave_namorita",
+      "breakpoints": true
     }
   ]
 }
