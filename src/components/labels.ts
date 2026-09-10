@@ -1,4 +1,10 @@
-import type { AccountStatus, CaseStatus, UserRole } from '@/db/schema';
+import type {
+  AccountStatus,
+  CaseResolution,
+  CaseStatus,
+  RecommendedResolution,
+  UserRole,
+} from '@/db/schema';
 
 /** The persisted role values are internal; these are what an operator reads. */
 export const ROLE_LABELS: Record<UserRole, string> = {
@@ -12,6 +18,19 @@ export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
   escalated: 'Awaiting Approval',
   approved: 'Approved',
   rejected: 'Rejected',
+};
+
+/** The outcome vocabulary the operator sees, over the persisted resolutions. */
+export const RESOLUTION_LABELS: Record<CaseResolution, string> = {
+  approved: 'Cleared as false positive',
+  rejected: 'Rejected',
+  confirmed_fraud: 'Confirmed suspicious activity',
+};
+
+export const RECOMMENDATION_LABELS: Record<RecommendedResolution, string> = {
+  approve: 'Clear as false positive',
+  reject: 'Reject',
+  confirm_fraud: 'Confirm suspicious activity',
 };
 
 export const ACCOUNT_STATUS_LABELS: Record<AccountStatus, string> = {

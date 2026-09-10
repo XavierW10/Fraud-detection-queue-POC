@@ -1,7 +1,15 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getCurrentUser } from '@/auth/currentUser';
+import { readOnlyReason } from '@/cases/actions';
+import { CaseActions } from '@/components/CaseActions';
 import { caseReference, formatAmount, formatTimestamp } from '@/components/format';
-import { ACCOUNT_STATUS_LABELS, CASE_STATUS_LABELS } from '@/components/labels';
+import {
+  ACCOUNT_STATUS_LABELS,
+  CASE_STATUS_LABELS,
+  RECOMMENDATION_LABELS,
+  RESOLUTION_LABELS,
+} from '@/components/labels';
 import { getDb } from '@/db/client';
 import type { RuleEvidence, TriggeredRule } from '@/db/schema';
 import { WorkflowError } from '@/workflow/errors';
@@ -10,9 +18,12 @@ import { getCaseDetail } from '@/workflow/queries';
 export default async function CasePage({ params }: PageProps<'/cases/[caseId]'>) {
   const { caseId } = await params;
 
+  const db = getDb();
+  const currentUser = await getCurrentUser(db);
+
   let detail;
   try {
-    detail = getCaseDetail(getDb(), caseId);
+    detail = getCaseDetail(db, caseId);
   } catch (error) {
     if (error instanceof WorkflowError && error.code === 'not_found') notFound();
     throw error;
@@ -20,6 +31,13 @@ export default async function CasePage({ params }: PageProps<'/cases/[caseId]'>)
 
   const { case: row, account, assignee, transactions, approvals, auditEvents } = detail;
   const cited = new Set(row.triggeredRules.flatMap((rule) => evidenceTransactionIds(rule)));
+
+  const pending = approvals.find(({ approval }) => approval.status === 'pending')?.approval ?? null;
+  const context = {
+    actor: currentUser,
+    case: { status: row.status, assignedTo: row.assignedTo, requiresSenior: row.requiresSenior },
+    pendingApproval: pending && { requestedBy: pending.requestedBy },
+  };
 
   return (
     <section className="space-y-4">
@@ -31,6 +49,29 @@ export default async function CasePage({ params }: PageProps<'/cases/[caseId]'>)
         <span className="text-xs text-slate-500">
           {account.externalRef} · {ACCOUNT_STATUS_LABELS[account.status]}
         </span>
+
+        <div className="ml-auto flex items-center gap-3">
+          {readOnlyReason(context) && (
+            <p className="text-xs text-slate-500">{readOnlyReason(context)}</p>
+          )}
+          <CaseActions
+            kase={{
+              id: row.id,
+              version: row.version,
+              status: row.status,
+              assignedTo: row.assignedTo,
+              requiresSenior: row.requiresSenior,
+            }}
+            actor={{ id: currentUser.id, role: currentUser.role }}
+            pendingApproval={
+              pending && {
+                id: pending.id,
+                version: pending.version,
+                requestedBy: pending.requestedBy,
+              }
+            }
+          />
+        </div>
       </header>
 
       <dl className="grid grid-cols-2 gap-3 rounded-md border border-slate-200 bg-white p-3 text-xs lg:grid-cols-4">
@@ -43,7 +84,7 @@ export default async function CasePage({ params }: PageProps<'/cases/[caseId]'>)
         <Fact label="Policy version" value={row.policyVersion} />
         <Fact label="Created" value={formatTimestamp(row.createdAt)} />
         <Fact label="Last updated" value={formatTimestamp(row.updatedAt)} />
-        <Fact label="Resolution" value={row.resolution ?? '—'} />
+        <Fact label="Resolution" value={row.resolution ? RESOLUTION_LABELS[row.resolution] : '—'} />
         <Fact label="Record version" value={String(row.version)} />
       </dl>
 
@@ -110,7 +151,7 @@ export default async function CasePage({ params }: PageProps<'/cases/[caseId]'>)
             <li key={approval.id} className="px-3 py-2">
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="font-medium">
-                  recommends {approval.recommendedResolution.replace('_', ' ')}
+                  recommends {RECOMMENDATION_LABELS[approval.recommendedResolution].toLowerCase()}
                 </span>
                 <span className="text-slate-500">
                   {approval.status} · requested by {requester.name}

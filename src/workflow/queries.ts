@@ -86,7 +86,15 @@ export function listApprovals(db: DbLike, filter: ApprovalFilter = {}) {
   return db
     .select({
       approval: approvals,
-      case: { id: cases.id, status: cases.status, riskScore: cases.riskScore },
+      case: {
+        id: cases.id,
+        status: cases.status,
+        riskScore: cases.riskScore,
+        requiresSenior: cases.requiresSenior,
+        triggeredRules: cases.triggeredRules,
+        assignedTo: cases.assignedTo,
+        version: cases.version,
+      },
       account: { id: accounts.id, externalRef: accounts.externalRef },
       requester: { id: users.id, name: users.name },
     })
