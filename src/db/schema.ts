@@ -7,6 +7,7 @@ export type UserRole = (typeof USER_ROLES)[number];
 export const ACCOUNT_STATUSES = [
   'clear',
   'flagged',
+  'known_bad',
   'under_review',
   'confirmed_fraud',
   'cleared',
