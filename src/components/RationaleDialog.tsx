@@ -38,6 +38,7 @@ export function RationaleDialog({
 }: RationaleDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
+  const rationaleRef = useRef<HTMLTextAreaElement>(null);
   const defaultChoice = choices?.options[0]?.value ?? '';
   const [rationale, setRationale] = useState('');
   const [choice, setChoice] = useState(defaultChoice);
@@ -58,6 +59,9 @@ export function RationaleDialog({
       setRationale('');
       setChoice(defaultChoice);
       dialog.showModal();
+      // React applies `autoFocus` at mount, so by the time the modal opens the
+      // attribute is gone and the first radio would take focus instead.
+      rationaleRef.current?.focus();
     } else if (!open && dialog.open) {
       dialog.close();
       openerRef.current?.focus();
@@ -114,7 +118,7 @@ export function RationaleDialog({
         <label className="block space-y-1">
           <span className="text-xs font-medium text-slate-600">Rationale</span>
           <textarea
-            autoFocus
+            ref={rationaleRef}
             rows={4}
             value={rationale}
             disabled={pending}
