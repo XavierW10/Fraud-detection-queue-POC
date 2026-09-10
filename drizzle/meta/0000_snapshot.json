@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "20f197fe-51b3-4586-b921-a1e5cc9ac137",
+  "id": "50b31e5c-870c-4f23-81a1-de6b217ccea6",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "accounts": {
@@ -210,13 +210,6 @@
         },
         "to_status": {
           "name": "to_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "metadata": {
-          "name": "metadata",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

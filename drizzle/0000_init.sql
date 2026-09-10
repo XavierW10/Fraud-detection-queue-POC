@@ -30,7 +30,6 @@ CREATE TABLE `audit_events` (
 	`action` text NOT NULL,
 	`from_status` text,
 	`to_status` text,
-	`metadata` text,
 	`created_at` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL,
 	FOREIGN KEY (`case_id`) REFERENCES `cases`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`actor_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action

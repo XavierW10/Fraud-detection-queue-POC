@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { auditEvents } from './schema';
 
@@ -13,7 +13,6 @@ export type NewAuditEvent = {
   action: string;
   fromStatus?: string | null;
   toStatus?: string | null;
-  metadata?: Record<string, unknown> | null;
 };
 
 export function insertAuditEvent(db: Db, event: NewAuditEvent) {
@@ -25,17 +24,19 @@ export function insertAuditEvent(db: Db, event: NewAuditEvent) {
       action: event.action,
       fromStatus: event.fromStatus ?? null,
       toStatus: event.toStatus ?? null,
-      metadata: event.metadata ?? null,
     })
     .returning()
     .get();
 }
 
 export function listAuditEventsForCase(db: Db, caseId: string) {
-  return db
-    .select()
-    .from(auditEvents)
-    .where(eq(auditEvents.caseId, caseId))
-    .orderBy(asc(auditEvents.createdAt))
-    .all();
+  return (
+    db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.caseId, caseId))
+      // Insertion order: UUID primary keys do not sort chronologically.
+      .orderBy(sql`rowid`)
+      .all()
+  );
 }

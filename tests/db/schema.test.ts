@@ -96,7 +96,6 @@ describe('audit_events append-only', () => {
       action: 'account_status_change',
       fromStatus: 'clear',
       toStatus: 'flagged',
-      metadata: { source: 'ingestion' },
     });
     insertAuditEvent(db, {
       caseId: kase.id,
@@ -111,7 +110,8 @@ describe('audit_events append-only', () => {
       ['account_status_change', null],
       ['open', reviewer.id],
     ]);
-    expect(events[0].metadata).toEqual({ source: 'ingestion' });
+    expect(events[0].fromStatus).toBe('clear');
+    expect(events[0].toStatus).toBe('flagged');
   });
 
   it('blocks UPDATE and DELETE at the database level', () => {

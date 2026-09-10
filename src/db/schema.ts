@@ -119,7 +119,6 @@ export const auditEvents = sqliteTable('audit_events', {
   action: text('action').notNull(),
   fromStatus: text('from_status'),
   toStatus: text('to_status'),
-  metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>(),
   /** Millisecond precision so the append-only trail has a stable read order. */
   createdAt: timestamp('created_at').notNull().default(now),
 });

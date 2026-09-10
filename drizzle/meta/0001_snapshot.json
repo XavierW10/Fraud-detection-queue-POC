@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "26613aff-1053-4644-8c59-fa808572d072",
-  "prevId": "20f197fe-51b3-4586-b921-a1e5cc9ac137",
+  "id": "00ab9bd8-559e-4a69-ba64-cb4ccbd4977d",
+  "prevId": "50b31e5c-870c-4f23-81a1-de6b217ccea6",
   "tables": {
     "accounts": {
       "name": "accounts",
@@ -210,13 +210,6 @@
         },
         "to_status": {
           "name": "to_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "metadata": {
-          "name": "metadata",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
