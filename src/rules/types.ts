@@ -1,4 +1,4 @@
-import type { AccountStatus, TriggeredRule } from '@/db/schema';
+import type { AccountStatus, EvidenceTransaction, TriggeredRule } from '@/db/schema';
 
 /** The transaction fields the rules evaluate. */
 export type EvaluatedTransaction = {
@@ -44,4 +44,16 @@ export const RULE_IDS = {
 
 export function byTimestamp(a: EvaluatedTransaction, b: EvaluatedTransaction): number {
   return a.timestamp.getTime() - b.timestamp.getTime();
+}
+
+/** The evidence view of a transaction: JSON-safe, and only the fields shown. */
+export function asEvidence(tx: EvaluatedTransaction): EvidenceTransaction {
+  return {
+    id: tx.id,
+    amount: tx.amount,
+    timestamp: tx.timestamp.toISOString(),
+    latitude: tx.latitude,
+    longitude: tx.longitude,
+    deviceId: tx.deviceId,
+  };
 }

@@ -1,5 +1,5 @@
 import type { SharedDeviceLinkageRule } from '@/policy/schema';
-import { RULE_IDS, type EvaluationInput, type RuleOutcome } from './types';
+import { asEvidence, byTimestamp, RULE_IDS, type EvaluationInput, type RuleOutcome } from './types';
 
 /**
  * Shared-device linkage: a device used by this account is also used by a
@@ -34,14 +34,30 @@ export function sharedDeviceLinkageRule(
     };
   }
 
-  const described = [
+  const distinct = [
     ...new Map(links.map((link) => [`${link.deviceId}:${link.accountId}`, link])).values(),
-  ].map((link) => `${link.deviceId} -> ${link.accountId} (${link.accountStatus})`);
+  ];
+  const described = distinct.map(
+    (link) => `${link.deviceId} -> ${link.accountId} (${link.accountStatus})`,
+  );
+  const sharedDevices = new Set(distinct.map((link) => link.deviceId));
 
   return {
     id,
     triggered: true,
     weight: rule.weight,
     reason: `Device shared with ${described.length} linked account(s): ${described.join(', ')}`,
+    evidence: {
+      kind: 'shared_device_linkage',
+      links: distinct.map((link) => ({
+        deviceId: link.deviceId,
+        accountId: link.accountId,
+        accountStatus: link.accountStatus,
+      })),
+      transactions: input.transactions
+        .filter((tx) => sharedDevices.has(tx.deviceId))
+        .sort(byTimestamp)
+        .map(asEvidence),
+    },
   };
 }

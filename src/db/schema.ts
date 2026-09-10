@@ -169,11 +169,50 @@ export const auditEvents = sqliteTable('audit_events', {
   createdAt: timestamp('created_at').notNull().default(now),
 });
 
+/** The transaction a rule points at, denormalised so the UI can highlight it. */
+export type EvidenceTransaction = {
+  id: string;
+  amount: number;
+  timestamp: string;
+  latitude: number;
+  longitude: number;
+  deviceId: string;
+};
+
+/**
+ * Machine-readable evidence, so a reviewer can be shown *which* records fired a
+ * rule rather than only a sentence about them. Persisted as JSON, hence ISO
+ * timestamps and a nullable speed (instantaneous travel has no finite value).
+ */
+export type RuleEvidence =
+  | {
+      kind: 'structuring';
+      transactions: EvidenceTransaction[];
+      windowStart: string;
+      windowEnd: string;
+      spanHours: number;
+    }
+  | {
+      kind: 'geo_impossibility';
+      from: EvidenceTransaction;
+      to: EvidenceTransaction;
+      distanceKm: number;
+      impliedKmPerHour: number | null;
+    }
+  | {
+      kind: 'shared_device_linkage';
+      links: { deviceId: string; accountId: string; accountStatus: AccountStatus }[];
+      /** This account's own transactions on the shared devices. */
+      transactions: EvidenceTransaction[];
+    };
+
 export type TriggeredRule = {
   id: string;
   triggered: boolean;
   weight: number;
   reason: string;
+  /** Present only on a triggered rule: the records the rule matched. */
+  evidence?: RuleEvidence;
 };
 
 export type User = typeof users.$inferSelect;

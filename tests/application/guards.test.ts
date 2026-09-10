@@ -231,4 +231,50 @@ describe('queue', () => {
     expect(after.cases.some((row: Json) => row.case.id === CASE_IDS.clear)).toBe(true);
     expect(after.currentUser.id).toBe(analyst().id);
   });
+
+  it('pages without repeating or dropping a case, and reports the unpaged total', async () => {
+    const [, all] = await api.cases();
+    const [status, first] = await api.cases('?limit=2&offset=0');
+    const [, second] = await api.cases('?limit=2&offset=2');
+
+    expect(status).toBe(200);
+    expect(first.page).toEqual({ limit: 2, offset: 0, total: all.page.total });
+    expect(first.cases.length).toBe(2);
+
+    const paged = [...first.cases, ...second.cases].map((row: Json) => row.case.id);
+    expect(paged).toEqual(all.cases.slice(0, 4).map((row: Json) => row.case.id));
+    expect(new Set(paged).size).toBe(paged.length);
+  });
+
+  it('refuses a page window it cannot serve', async () => {
+    expect((await api.cases('?limit=0'))[0]).toBe(400);
+    expect((await api.cases('?limit=1000'))[0]).toBe(400);
+    expect((await api.cases('?offset=-1'))[0]).toBe(400);
+  });
+});
+
+describe('change signal', () => {
+  it('answers an unchanged queue with 304 and a changed one with fresh data', async () => {
+    const first = await api.raw.cases();
+    const etag = first.headers.get('etag')!;
+    expect(etag).toBeTruthy();
+
+    expect((await api.raw.cases('', { 'if-none-match': etag })).status).toBe(304);
+
+    await api.claim(CASE_IDS.clear, 1);
+    const changed = await api.raw.cases('', { 'if-none-match': etag });
+    expect(changed.status).toBe(200);
+    expect(changed.headers.get('etag')).not.toBe(etag);
+  });
+
+  it('gives each case page its own tag, so watching one is not disturbed by another', async () => {
+    const watched = await api.raw.case(CASE_IDS.sharedDevice);
+    const etag = watched.headers.get('etag')!;
+
+    await api.claim(CASE_IDS.clear, 1);
+    expect((await api.raw.case(CASE_IDS.sharedDevice, { 'if-none-match': etag })).status).toBe(304);
+
+    await api.claim(CASE_IDS.sharedDevice, 1);
+    expect((await api.raw.case(CASE_IDS.sharedDevice, { 'if-none-match': etag })).status).toBe(200);
+  });
 });

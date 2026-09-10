@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { PolicyError } from '@/policy/load';
 import { WorkflowError } from '@/workflow/errors';
@@ -28,6 +29,41 @@ export async function respond(run: () => Promise<unknown>): Promise<Response> {
   } catch (error) {
     return toResponse(error);
   }
+}
+
+/**
+ * A read whose response carries an `ETag` over the exact bytes returned. The
+ * client re-sends it as `If-None-Match` and gets `304 Not Modified` while
+ * nothing it can see has changed, so a queue or case page can poll for a change
+ * signal cheaply instead of learning about one only when a write is refused.
+ */
+export async function respondCacheable(
+  request: Request,
+  run: () => Promise<unknown>,
+): Promise<Response> {
+  try {
+    const body = JSON.stringify(await run());
+    const etag = `"${createHash('sha256').update(body).digest('base64url')}"`;
+    const headers = { etag, 'cache-control': 'no-cache, private' };
+
+    return matchesEtag(request.headers.get('if-none-match'), etag)
+      ? new Response(null, { status: 304, headers })
+      : new Response(body, {
+          status: 200,
+          headers: { ...headers, 'content-type': 'application/json' },
+        });
+  } catch (error) {
+    return toResponse(error);
+  }
+}
+
+/** `If-None-Match` is a list, and may weaken each entry with a `W/` prefix. */
+function matchesEtag(header: string | null, etag: string): boolean {
+  if (!header) return false;
+  return header
+    .split(',')
+    .map((candidate) => candidate.trim().replace(/^W\//, ''))
+    .some((candidate) => candidate === '*' || candidate === etag);
 }
 
 function parse<S extends z.ZodType>(schema: S, value: unknown, label: string): z.infer<S> {

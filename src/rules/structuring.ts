@@ -1,5 +1,6 @@
 import type { StructuringRule } from '@/policy/schema';
 import {
+  asEvidence,
   byTimestamp,
   RULE_IDS,
   type EvaluatedTransaction,
@@ -34,12 +35,21 @@ export function structuringRule(input: EvaluationInput, rule: StructuringRule): 
     };
   }
 
-  const spanHours = (last(window).timestamp.getTime() - window[0].timestamp.getTime()) / HOUR_MS;
+  const spanHours = round(
+    (last(window).timestamp.getTime() - window[0].timestamp.getTime()) / HOUR_MS,
+  );
   return {
     id,
     triggered: true,
     weight: rule.weight,
-    reason: `${window.length} transactions between ${rule.minAmount} and ${rule.maxAmount} within ${round(spanHours)}h (${window[0].timestamp.toISOString()} - ${last(window).timestamp.toISOString()}): ${window.map((tx) => tx.amount).join(', ')}`,
+    reason: `${window.length} transactions between ${rule.minAmount} and ${rule.maxAmount} within ${spanHours}h (${window[0].timestamp.toISOString()} - ${last(window).timestamp.toISOString()}): ${window.map((tx) => tx.amount).join(', ')}`,
+    evidence: {
+      kind: 'structuring',
+      transactions: window.map(asEvidence),
+      windowStart: window[0].timestamp.toISOString(),
+      windowEnd: last(window).timestamp.toISOString(),
+      spanHours,
+    },
   };
 }
 

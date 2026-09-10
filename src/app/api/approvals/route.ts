@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { NextRequest } from 'next/server';
-import { parseQuery, respond } from '@/api/http';
+import { parseQuery, respondCacheable } from '@/api/http';
 import { id } from '@/api/schemas';
 import { getCurrentUser } from '@/auth/currentUser';
 import { getDb } from '@/db/client';
@@ -13,7 +13,7 @@ const querySchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  return respond(async () => {
+  return respondCacheable(request, async () => {
     const query = parseQuery(querySchema, new URL(request.url));
     const db = getDb();
 

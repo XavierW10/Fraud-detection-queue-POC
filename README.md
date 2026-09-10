@@ -71,7 +71,7 @@ respond) and share one error mapper:
 
 | endpoint                                   | purpose                          |
 | ------------------------------------------ | -------------------------------- |
-| `GET /api/cases`                           | queue, filterable                |
+| `GET /api/cases`                           | queue, filterable and paged      |
 | `GET /api/cases/:caseId`                   | case detail with the audit trail |
 | `POST /api/cases/:caseId/claim`            | claim a pending case             |
 | `POST /api/cases/:caseId/decision`         | resolve directly                 |
@@ -79,6 +79,16 @@ respond) and share one error mapper:
 | `GET /api/approvals`                       | approval requests                |
 | `POST /api/approvals/:approvalId/decision` | senior approves or returns       |
 | `GET /api/policy`                          | the policy in force              |
+
+The queue takes `?limit=` (1-100, default 25) and `?offset=`, and answers with the page window
+and the unpaged `total`. The two queue reads and the case detail carry an `ETag` over the bytes
+they return: send it back as `If-None-Match` and an unchanged page answers `304`, so a client can
+poll for someone else's change instead of discovering it when its own write is refused with `409`.
+
+Each triggered rule carries `evidence` alongside its sentence: the transactions in the qualifying
+structuring window, the fastest geo pair with distance and implied speed, or the linked
+device/account pairs and this account's transactions on those devices — enough for the UI to
+highlight the rows a rule fired on.
 
 ## Tests
 
