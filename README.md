@@ -90,6 +90,19 @@ structuring window, the fastest geo pair with distance and implied speed, or the
 device/account pairs and this account's transactions on those devices — enough for the UI to
 highlight the rows a rule fired on.
 
+## Application shell
+
+`src/app/layout.tsx` renders a compact internal-tool shell: the application name, primary
+navigation, the current user, and the demo-persona switcher in the top right. Navigation is
+role-aware — Approvals is a senior's inbox, so an analyst is not offered the tab, and the page
+refuses it as well. Choosing a persona calls the `switchPersona` server action in
+`src/app/actions.ts`, which validates the id against the seeded users, writes `demo_user_id` and
+revalidates the layout, so the header, nav and page data all re-render as the chosen user without
+a full reload.
+
+Pages: `/queue` (the operational queue, filterable to the current user's cases), `/approvals`
+(pending requests, senior only) and `/policy` (the rules and threshold in force).
+
 ## Tests
 
 `tests/rules` covers the pure policy logic; `tests/application` drives the real route handlers
