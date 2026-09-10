@@ -78,6 +78,30 @@ describe('schema defaults', () => {
     ).toThrow(/FOREIGN KEY/i);
   });
 
+  it('rejects enum values the database does not know', () => {
+    const account = db.insert(accounts).values({ externalRef: 'ACC-CHECK' }).returning().get();
+
+    expect(() =>
+      sqlite.prepare('UPDATE accounts SET status = ? WHERE id = ?').run('bogus', account.id),
+    ).toThrow(/CHECK constraint failed: accounts_status_check/);
+    expect(() =>
+      sqlite
+        .prepare('INSERT INTO users (id, email, role) VALUES (?, ?, ?)')
+        .run(crypto.randomUUID(), 'nobody@example.com', 'admin'),
+    ).toThrow(/CHECK constraint failed: users_role_check/);
+
+    // A nullable enum column still accepts null, but not an unknown value.
+    const kase = db
+      .insert(cases)
+      .values({ accountId: account.id, policyVersion: 'p@1' })
+      .returning()
+      .get();
+    expect(kase.resolution).toBeNull();
+    expect(() =>
+      sqlite.prepare('UPDATE cases SET resolution = ? WHERE id = ?').run('maybe', kase.id),
+    ).toThrow(/CHECK constraint failed: cases_resolution_check/);
+  });
+
   it('creates no secondary indexes', () => {
     const indexes = sqlite
       .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND sql IS NOT NULL")

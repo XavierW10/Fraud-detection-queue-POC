@@ -1,10 +1,11 @@
-import { db, runMigrations } from './client';
+import { getDb, runMigrations } from './client';
 import { accounts, transactions, users } from './schema';
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 
 function seed() {
+  const db = getDb();
   runMigrations(db);
 
   db.delete(transactions).run();

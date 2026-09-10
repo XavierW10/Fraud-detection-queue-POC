@@ -5,7 +5,8 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import * as schema from './schema';
 
-export type Db = ReturnType<typeof createDb>['db'];
+export type Connection = ReturnType<typeof createDb>;
+export type Db = Connection['db'];
 
 export function createDb(url: string) {
   if (url !== ':memory:') {
@@ -18,8 +19,24 @@ export function createDb(url: string) {
   return { sqlite, db };
 }
 
-export function runMigrations(db: ReturnType<typeof createDb>['db']) {
-  migrate(db, { migrationsFolder: path.join(process.cwd(), 'drizzle') });
+/**
+ * Migrations that add or change constraints rebuild the table, which SQLite
+ * only tolerates with foreign keys disabled — and the pragma is a no-op inside
+ * the transaction the migrator opens, so it is toggled here instead. Integrity
+ * is re-checked before foreign keys go back on.
+ */
+export function runMigrations(db: Db) {
+  const sqlite = db.$client;
+  sqlite.pragma('foreign_keys = OFF');
+  try {
+    migrate(db, { migrationsFolder: path.join(process.cwd(), 'drizzle') });
+    const violations = sqlite.pragma('foreign_key_check') as unknown[];
+    if (violations.length > 0) {
+      throw new Error(`Migration left ${violations.length} foreign key violation(s)`);
+    }
+  } finally {
+    sqlite.pragma('foreign_keys = ON');
+  }
 }
 
 /** In-memory database with migrations applied — used by tests. */
@@ -29,12 +46,22 @@ export function createTestDb() {
   return { sqlite, db };
 }
 
-const databaseUrl = process.env.DATABASE_URL ?? path.join(process.cwd(), 'data', 'app.db');
+const globalForDb = globalThis as unknown as { __db?: Connection };
 
-const globalForDb = globalThis as unknown as { __db?: ReturnType<typeof createDb> };
+/**
+ * The application connection, opened on first use. Importing this module must
+ * stay side-effect free so tests and tooling never touch the on-disk database.
+ */
+export function getConnection(): Connection {
+  const existing = globalForDb.__db;
+  if (existing) return existing;
 
-const connection = globalForDb.__db ?? createDb(databaseUrl);
-if (process.env.NODE_ENV !== 'production') globalForDb.__db = connection;
+  const url = process.env.DATABASE_URL ?? path.join(process.cwd(), 'data', 'app.db');
+  const connection = createDb(url);
+  globalForDb.__db = connection;
+  return connection;
+}
 
-export const sqlite = connection.sqlite;
-export const db = connection.db;
+export function getDb(): Db {
+  return getConnection().db;
+}

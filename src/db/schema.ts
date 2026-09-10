@@ -1,5 +1,5 @@
-import { sql } from 'drizzle-orm';
-import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sql, type SQL } from 'drizzle-orm';
+import { check, integer, real, sqliteTable, text, type AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 
 export const USER_ROLES = ['reviewer', 'senior'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
@@ -30,24 +30,40 @@ const now = sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`;
 
 const timestamp = (name: string) => integer(name, { mode: 'timestamp_ms' });
 
+/**
+ * Drizzle's `enum` option is a TypeScript-only refinement, so each enum column
+ * also carries a CHECK constraint keeping the values enforced in the database.
+ */
+const oneOf = (column: AnySQLiteColumn, values: readonly string[]): SQL =>
+  // Literals, not bound parameters: a CHECK constraint is stored SQL text.
+  sql`${column} in (${sql.raw(values.map((value) => `'${value}'`).join(', '))})`;
+
 const uuid = (name: string) =>
   text(name)
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID());
 
-export const users = sqliteTable('users', {
-  id: uuid('id'),
-  email: text('email').notNull(),
-  role: text('role', { enum: USER_ROLES }).notNull(),
-  createdAt: timestamp('created_at').notNull().default(now),
-});
+export const users = sqliteTable(
+  'users',
+  {
+    id: uuid('id'),
+    email: text('email').notNull(),
+    role: text('role', { enum: USER_ROLES }).notNull(),
+    createdAt: timestamp('created_at').notNull().default(now),
+  },
+  (table) => [check('users_role_check', oneOf(table.role, USER_ROLES))],
+);
 
-export const accounts = sqliteTable('accounts', {
-  id: uuid('id'),
-  externalRef: text('external_ref').notNull(),
-  status: text('status', { enum: ACCOUNT_STATUSES }).notNull().default('clear'),
-  createdAt: timestamp('created_at').notNull().default(now),
-});
+export const accounts = sqliteTable(
+  'accounts',
+  {
+    id: uuid('id'),
+    externalRef: text('external_ref').notNull(),
+    status: text('status', { enum: ACCOUNT_STATUSES }).notNull().default('clear'),
+    createdAt: timestamp('created_at').notNull().default(now),
+  },
+  (table) => [check('accounts_status_check', oneOf(table.status, ACCOUNT_STATUSES))],
+);
 
 export const transactions = sqliteTable('transactions', {
   id: uuid('id'),
@@ -62,50 +78,70 @@ export const transactions = sqliteTable('transactions', {
   createdAt: timestamp('created_at').notNull().default(now),
 });
 
-export const cases = sqliteTable('cases', {
-  id: uuid('id'),
-  accountId: text('account_id')
-    .notNull()
-    .references(() => accounts.id),
-  assignedTo: text('assigned_to').references(() => users.id),
-  lockedBy: text('locked_by').references(() => users.id),
-  lockedAt: timestamp('locked_at'),
-  status: text('status', { enum: CASE_STATUSES }).notNull().default('pending'),
-  riskScore: real('risk_score').notNull().default(0),
-  requiresSenior: integer('requires_senior', { mode: 'boolean' }).notNull().default(false),
-  triggeredRules: text('triggered_rules', { mode: 'json' })
-    .notNull()
-    .$type<TriggeredRule[]>()
-    .default(sql`'[]'`),
-  policyVersion: text('policy_version').notNull(),
-  resolution: text('resolution', { enum: CASE_RESOLUTIONS }),
-  rationale: text('rationale'),
-  createdAt: timestamp('created_at').notNull().default(now),
-  updatedAt: timestamp('updated_at').notNull().default(now),
-  resolvedAt: timestamp('resolved_at'),
-  version: integer('version').notNull().default(1),
-});
+export const cases = sqliteTable(
+  'cases',
+  {
+    id: uuid('id'),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    assignedTo: text('assigned_to').references(() => users.id),
+    lockedBy: text('locked_by').references(() => users.id),
+    lockedAt: timestamp('locked_at'),
+    status: text('status', { enum: CASE_STATUSES }).notNull().default('pending'),
+    riskScore: real('risk_score').notNull().default(0),
+    requiresSenior: integer('requires_senior', { mode: 'boolean' }).notNull().default(false),
+    triggeredRules: text('triggered_rules', { mode: 'json' })
+      .notNull()
+      .$type<TriggeredRule[]>()
+      .default(sql`'[]'`),
+    policyVersion: text('policy_version').notNull(),
+    resolution: text('resolution', { enum: CASE_RESOLUTIONS }),
+    rationale: text('rationale'),
+    createdAt: timestamp('created_at').notNull().default(now),
+    updatedAt: timestamp('updated_at').notNull().default(now),
+    resolvedAt: timestamp('resolved_at'),
+    version: integer('version').notNull().default(1),
+  },
+  (table) => [
+    check('cases_status_check', oneOf(table.status, CASE_STATUSES)),
+    check(
+      'cases_resolution_check',
+      sql`${table.resolution} is null or ${oneOf(table.resolution, CASE_RESOLUTIONS)}`,
+    ),
+  ],
+);
 
-export const approvals = sqliteTable('approvals', {
-  id: uuid('id'),
-  caseId: text('case_id')
-    .notNull()
-    .references(() => cases.id),
-  recommendedResolution: text('recommended_resolution', {
-    enum: RECOMMENDED_RESOLUTIONS,
-  }).notNull(),
-  requesterReason: text('requester_reason').notNull(),
-  seniorDecisionReason: text('senior_decision_reason'),
-  status: text('status', { enum: APPROVAL_STATUSES }).notNull().default('pending'),
-  requestedBy: text('requested_by')
-    .notNull()
-    .references(() => users.id),
-  decidedBy: text('decided_by').references(() => users.id),
-  createdAt: timestamp('created_at').notNull().default(now),
-  updatedAt: timestamp('updated_at').notNull().default(now),
-  decidedAt: timestamp('decided_at'),
-  version: integer('version').notNull().default(1),
-});
+export const approvals = sqliteTable(
+  'approvals',
+  {
+    id: uuid('id'),
+    caseId: text('case_id')
+      .notNull()
+      .references(() => cases.id),
+    recommendedResolution: text('recommended_resolution', {
+      enum: RECOMMENDED_RESOLUTIONS,
+    }).notNull(),
+    requesterReason: text('requester_reason').notNull(),
+    seniorDecisionReason: text('senior_decision_reason'),
+    status: text('status', { enum: APPROVAL_STATUSES }).notNull().default('pending'),
+    requestedBy: text('requested_by')
+      .notNull()
+      .references(() => users.id),
+    decidedBy: text('decided_by').references(() => users.id),
+    createdAt: timestamp('created_at').notNull().default(now),
+    updatedAt: timestamp('updated_at').notNull().default(now),
+    decidedAt: timestamp('decided_at'),
+    version: integer('version').notNull().default(1),
+  },
+  (table) => [
+    check(
+      'approvals_recommended_resolution_check',
+      oneOf(table.recommendedResolution, RECOMMENDED_RESOLUTIONS),
+    ),
+    check('approvals_status_check', oneOf(table.status, APPROVAL_STATUSES)),
+  ],
+);
 
 /**
  * Append-only audit trail. Rows are immutable after insert: there are no
