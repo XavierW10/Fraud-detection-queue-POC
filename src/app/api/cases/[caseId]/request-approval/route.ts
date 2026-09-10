@@ -16,12 +16,14 @@ export async function POST(
     const actor = await getCurrentUser(db);
     assertRoleAllowed('request_approval', actor);
 
-    return requestApproval(db, {
+    const result = requestApproval(db, {
       caseId,
       actor,
       expectedVersion: body.expectedVersion,
       recommendedResolution: body.recommendedResolution,
       requesterReason: body.requesterReason,
     });
+
+    return { case: result.case, approval: result.approval };
   });
 }

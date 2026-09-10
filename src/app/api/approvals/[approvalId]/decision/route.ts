@@ -17,7 +17,7 @@ export async function POST(
     // Non-seniors are refused here, before the approval is even read.
     assertRoleAllowed('decide_approval', actor);
 
-    return decideApproval(db, {
+    const result = decideApproval(db, {
       approvalId,
       actor,
       decision: body.decision,
@@ -25,5 +25,7 @@ export async function POST(
       expectedApprovalVersion: body.expectedApprovalVersion,
       expectedCaseVersion: body.expectedCaseVersion,
     });
+
+    return { case: result.case, approval: result.approval };
   });
 }

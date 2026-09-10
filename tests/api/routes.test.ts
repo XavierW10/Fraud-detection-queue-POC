@@ -198,6 +198,7 @@ describe('writes', () => {
     );
     expect(requested).toBe(200);
     expect(escalation.case.status).toBe('escalated');
+    expect(Object.keys(escalation)).toEqual(['case', 'approval']);
 
     const [, queue] = await read(await getApprovals(get('/api/approvals?status=pending')));
     expect(queue.approvals).toHaveLength(1);
@@ -215,6 +216,7 @@ describe('writes', () => {
       await postApprovalDecision(decision, params({ approvalId: escalation.approval.id })),
     );
     expect(status).toBe(200);
+    expect(Object.keys(body)).toEqual(['case', 'approval']);
     expect(body.case.status).toBe('rejected');
     expect(body.case.resolution).toBe('confirmed_fraud');
   });
