@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { insertAuditEvent } from '@/db/audit';
+import { insertAuditEvent, statusBeforeChangeTo } from '@/db/audit';
 import type { Db, DbLike } from '@/db/client';
 import {
   accounts,
@@ -200,6 +200,13 @@ export function decideApproval(
         fromStatus: kase.status,
         toStatus: returned.status,
       });
+      // The escalation put the account under review; returning the case undoes it.
+      setAccountStatus(
+        tx,
+        kase,
+        input.actor.id,
+        (current) => statusBeforeChangeTo(tx, kase.id, 'under_review') ?? current,
+      );
       return { case: returned, approval: decided };
     }
 
@@ -236,7 +243,12 @@ function closeCase(
     fromStatus: kase.status,
     toStatus: closed.status,
   });
-  setAccountStatus(tx, kase, actor.id, ACCOUNT_STATUS_FOR_RESOLUTION[resolution]);
+  setAccountStatus(tx, kase, actor.id, (current) =>
+    // Clearing a case is not an intel finding: a known-bad account stays known bad.
+    resolution === 'approved' && current === 'known_bad'
+      ? current
+      : ACCOUNT_STATUS_FOR_RESOLUTION[resolution],
+  );
   return closed;
 }
 
@@ -274,9 +286,17 @@ function updateCase(tx: DbLike, kase: Case, patch: Partial<Case>): Case {
 }
 
 /** Account status is a separate axis from the case, so it gets its own event. */
-function setAccountStatus(tx: DbLike, kase: Case, actorId: string, status: AccountStatus): void {
+function setAccountStatus(
+  tx: DbLike,
+  kase: Case,
+  actorId: string,
+  next: AccountStatus | ((current: AccountStatus) => AccountStatus),
+): void {
   const account = tx.select().from(accounts).where(eq(accounts.id, kase.accountId)).get();
-  if (!account || account.status === status) return;
+  if (!account) return;
+
+  const status = typeof next === 'function' ? next(account.status) : next;
+  if (account.status === status) return;
 
   tx.update(accounts).set({ status }).where(eq(accounts.id, account.id)).run();
   insertAuditEvent(tx, {

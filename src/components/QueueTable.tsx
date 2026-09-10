@@ -43,8 +43,13 @@ export function QueueTable({ rows, currentUserId }: { rows: QueueRow[]; currentU
     setFailure(null);
     startClaim(async () => {
       const result = await caseApi.claim(row.id, row.version);
-      if (result.ok) router.refresh();
-      else setFailure({ id: row.id, message: result.message });
+      if (result.ok) {
+        router.refresh();
+        return;
+      }
+      setFailure({ id: row.id, message: result.message });
+      // A conflict means this row is stale; re-read so the retry sees the truth.
+      if (result.code === 'conflict') router.refresh();
     });
   };
 

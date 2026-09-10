@@ -128,6 +128,10 @@ describe('above-threshold case', () => {
     });
     expect([returned.case.status, returned.approval.status]).toEqual(['in_review', 'rejected']);
 
+    // The return handed the account back too, rather than leaving it under review.
+    const [, returnedDetail] = await api.case(kase.id);
+    expect(returnedDetail.account.status).toBe('flagged');
+
     actAs(analyst());
     const [resent, second] = await api.requestApproval(kase.id, {
       expectedVersion: returned.case.version,
@@ -172,6 +176,27 @@ describe('above-threshold case', () => {
     // No approval request was needed, so only the two seeded ones exist.
     const [, all] = await api.approvals();
     expect(all.approvals).toHaveLength(2);
+  });
+
+  it('leaves a known-bad account known bad when the case is cleared', async () => {
+    const kase = newFlaggedCase('ACC-2005', 'known_bad');
+
+    actAs(senior());
+    const [, opened] = await api.claim(kase.id, kase.version);
+    const [status] = await api.decide(kase.id, {
+      expectedVersion: opened.case.version,
+      resolution: 'approved',
+      rationale: 'These particular transactions are explained; the account stays known bad.',
+    });
+
+    // Clearing one case is not an intel finding: the shared-device rule still
+    // scores accounts linked to this one.
+    const [, detail] = await api.case(kase.id);
+    expect([status, detail.case.status, detail.account.status]).toEqual([
+      200,
+      'approved',
+      'known_bad',
+    ]);
   });
 
   it('will not be closed around a request the senior queue is still holding', async () => {
