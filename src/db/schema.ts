@@ -25,43 +25,50 @@ export type RecommendedResolution = (typeof RECOMMENDED_RESOLUTIONS)[number];
 export const APPROVAL_STATUSES = ['pending', 'approved', 'rejected'] as const;
 export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
 
-const now = sql`(unixepoch())`;
+const now = sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`;
+
+const timestamp = (name: string) => integer(name, { mode: 'timestamp_ms' });
+
+const uuid = (name: string) =>
+  text(name)
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID());
 
 export const users = sqliteTable('users', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+  id: uuid('id'),
   email: text('email').notNull(),
   role: text('role', { enum: USER_ROLES }).notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(now),
+  createdAt: timestamp('created_at').notNull().default(now),
 });
 
 export const accounts = sqliteTable('accounts', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+  id: uuid('id'),
   externalRef: text('external_ref').notNull(),
   status: text('status', { enum: ACCOUNT_STATUSES }).notNull().default('clear'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(now),
+  createdAt: timestamp('created_at').notNull().default(now),
 });
 
 export const transactions = sqliteTable('transactions', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  accountId: integer('account_id')
+  id: uuid('id'),
+  accountId: text('account_id')
     .notNull()
     .references(() => accounts.id),
   amount: real('amount').notNull(),
-  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(),
+  timestamp: timestamp('timestamp').notNull(),
   latitude: real('latitude').notNull(),
   longitude: real('longitude').notNull(),
   deviceId: text('device_id').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(now),
+  createdAt: timestamp('created_at').notNull().default(now),
 });
 
 export const cases = sqliteTable('cases', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  accountId: integer('account_id')
+  id: uuid('id'),
+  accountId: text('account_id')
     .notNull()
     .references(() => accounts.id),
-  assignedTo: integer('assigned_to').references(() => users.id),
-  lockedBy: integer('locked_by').references(() => users.id),
-  lockedAt: integer('locked_at', { mode: 'timestamp' }),
+  assignedTo: text('assigned_to').references(() => users.id),
+  lockedBy: text('locked_by').references(() => users.id),
+  lockedAt: timestamp('locked_at'),
   status: text('status', { enum: CASE_STATUSES }).notNull().default('pending'),
   riskScore: real('risk_score').notNull().default(0),
   requiresSenior: integer('requires_senior', { mode: 'boolean' }).notNull().default(false),
@@ -72,15 +79,15 @@ export const cases = sqliteTable('cases', {
   policyVersion: text('policy_version').notNull(),
   resolution: text('resolution', { enum: CASE_RESOLUTIONS }),
   rationale: text('rationale'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(now),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(now),
-  resolvedAt: integer('resolved_at', { mode: 'timestamp' }),
+  createdAt: timestamp('created_at').notNull().default(now),
+  updatedAt: timestamp('updated_at').notNull().default(now),
+  resolvedAt: timestamp('resolved_at'),
   version: integer('version').notNull().default(1),
 });
 
 export const approvals = sqliteTable('approvals', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  caseId: integer('case_id')
+  id: uuid('id'),
+  caseId: text('case_id')
     .notNull()
     .references(() => cases.id),
   recommendedResolution: text('recommended_resolution', {
@@ -89,13 +96,13 @@ export const approvals = sqliteTable('approvals', {
   requesterReason: text('requester_reason').notNull(),
   seniorDecisionReason: text('senior_decision_reason'),
   status: text('status', { enum: APPROVAL_STATUSES }).notNull().default('pending'),
-  requestedBy: integer('requested_by')
+  requestedBy: text('requested_by')
     .notNull()
     .references(() => users.id),
-  decidedBy: integer('decided_by').references(() => users.id),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(now),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(now),
-  decidedAt: integer('decided_at', { mode: 'timestamp' }),
+  decidedBy: text('decided_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().default(now),
+  updatedAt: timestamp('updated_at').notNull().default(now),
+  decidedAt: timestamp('decided_at'),
   version: integer('version').notNull().default(1),
 });
 
@@ -104,16 +111,17 @@ export const approvals = sqliteTable('approvals', {
  * mutable columns and DB triggers abort any UPDATE or DELETE.
  */
 export const auditEvents = sqliteTable('audit_events', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  caseId: integer('case_id')
+  id: uuid('id'),
+  caseId: text('case_id')
     .notNull()
     .references(() => cases.id),
-  actorId: integer('actor_id').references(() => users.id),
+  actorId: text('actor_id').references(() => users.id),
   action: text('action').notNull(),
   fromStatus: text('from_status'),
   toStatus: text('to_status'),
   metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(now),
+  /** Millisecond precision so the append-only trail has a stable read order. */
+  createdAt: timestamp('created_at').notNull().default(now),
 });
 
 export type TriggeredRule = {

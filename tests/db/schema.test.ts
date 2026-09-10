@@ -45,6 +45,7 @@ describe('schema defaults', () => {
       .values({ accountId: account.id, policyVersion: 'p@1' })
       .returning()
       .get();
+    expect(kase.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(kase.status).toBe('pending');
     expect(kase.requiresSenior).toBe(false);
     expect(kase.triggeredRules).toEqual([]);
@@ -72,9 +73,9 @@ describe('schema defaults', () => {
   });
 
   it('enforces foreign keys', () => {
-    expect(() => db.insert(cases).values({ accountId: 999, policyVersion: 'p@1' }).run()).toThrow(
-      /FOREIGN KEY/i,
-    );
+    expect(() =>
+      db.insert(cases).values({ accountId: 'missing-account', policyVersion: 'p@1' }).run(),
+    ).toThrow(/FOREIGN KEY/i);
   });
 
   it('creates no secondary indexes', () => {

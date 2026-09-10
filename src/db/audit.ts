@@ -8,8 +8,8 @@ import { auditEvents } from './schema';
  * and DB triggers abort such statements.
  */
 export type NewAuditEvent = {
-  caseId: number;
-  actorId?: number | null;
+  caseId: string;
+  actorId?: string | null;
   action: string;
   fromStatus?: string | null;
   toStatus?: string | null;
@@ -31,11 +31,11 @@ export function insertAuditEvent(db: Db, event: NewAuditEvent) {
     .get();
 }
 
-export function listAuditEventsForCase(db: Db, caseId: number) {
+export function listAuditEventsForCase(db: Db, caseId: string) {
   return db
     .select()
     .from(auditEvents)
     .where(eq(auditEvents.caseId, caseId))
-    .orderBy(asc(auditEvents.id))
+    .orderBy(asc(auditEvents.createdAt))
     .all();
 }
