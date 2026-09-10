@@ -149,13 +149,13 @@ describe('geo-impossibility rule', () => {
 describe('shared-device linkage rule', () => {
   const rule = policy.rules.sharedDeviceLinkage;
 
-  it('triggers on a device shared with a flagged or confirmed-fraud account', () => {
+  it('triggers on a device shared with a flagged or known-bad account', () => {
     const outcome = sharedDeviceLinkageRule(
       input(
         [tx({ deviceId: 'device-shared' })],
         [
           { deviceId: 'device-shared', accountId: 'other-1', accountStatus: 'flagged' },
-          { deviceId: 'device-shared', accountId: 'other-2', accountStatus: 'confirmed_fraud' },
+          { deviceId: 'device-shared', accountId: 'other-2', accountStatus: 'known_bad' },
         ],
       ),
       rule,
@@ -176,8 +176,9 @@ describe('shared-device linkage rule', () => {
         [
           { deviceId: 'device-a', accountId: 'other-clean', accountStatus: 'clear' },
           { deviceId: 'device-a', accountId: 'other-cleared', accountStatus: 'cleared' },
+          { deviceId: 'device-a', accountId: 'other-fraud', accountStatus: 'confirmed_fraud' },
           { deviceId: 'device-a', accountId: ACCOUNT, accountStatus: 'flagged' },
-          { deviceId: 'device-other', accountId: 'other-bad', accountStatus: 'confirmed_fraud' },
+          { deviceId: 'device-other', accountId: 'other-bad', accountStatus: 'known_bad' },
         ],
       ),
       rule,
@@ -192,7 +193,7 @@ describe('shared-device linkage rule', () => {
         [
           { deviceId: 'device-a', accountId: 'direct', accountStatus: 'flagged' },
           // 'direct' also uses device-b with 'indirect' — must not be reported.
-          { deviceId: 'device-b', accountId: 'indirect', accountStatus: 'confirmed_fraud' },
+          { deviceId: 'device-b', accountId: 'indirect', accountStatus: 'known_bad' },
         ],
       ),
       rule,
@@ -235,7 +236,7 @@ describe('score aggregation', () => {
             deviceId: 'device-shared',
           }),
         ],
-        [{ deviceId: 'device-shared', accountId: 'other-bad', accountStatus: 'confirmed_fraud' }],
+        [{ deviceId: 'device-shared', accountId: 'other-bad', accountStatus: 'known_bad' }],
       ),
       policy,
     );

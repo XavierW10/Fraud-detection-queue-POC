@@ -26,4 +26,4 @@ rules:
     # accounts.status values that make a linked account suspicious
     linkedAccountStatuses:
       - flagged
-      - confirmed_fraud
+      - known_bad

@@ -25,7 +25,7 @@ rules:
     weight: 40
     linkedAccountStatuses:
       - flagged
-      - confirmed_fraud
+      - known_bad
 `;
 
 function withPatch(patch: string) {
