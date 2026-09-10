@@ -14,10 +14,33 @@ import {
 import { accounts, approvals, auditEvents, cases, transactions, users } from './schema';
 
 /**
+ * Columns the workflow writes but a seed row may omit. An upsert only sets the
+ * keys it is given, so without these an already-worked case would keep the
+ * assignee or resolution the demo gave it and re-seeding would not restore the
+ * starting state.
+ */
+const CASE_DEFAULTS = {
+  assignedTo: null,
+  lockedBy: null,
+  lockedAt: null,
+  resolution: null,
+  rationale: null,
+  resolvedAt: null,
+} as const;
+
+const APPROVAL_DEFAULTS = {
+  seniorDecisionReason: null,
+  decidedBy: null,
+  decidedAt: null,
+} as const;
+
+/**
  * Loads the fixed demo dataset. Idempotent: every row has a literal id and is
  * upserted, so running the seed twice leaves the same rows rather than
- * duplicating them. `audit_events` is append-only, so existing rows are left
- * alone instead of being rewritten.
+ * duplicating them, and a case or approval the demo has moved on is restored
+ * to its seeded state. `audit_events` is append-only, so existing rows are
+ * left alone instead of being rewritten — including any the demo added, which
+ * `npm run db:reset` clears by rebuilding the database.
  */
 export function seedDatabase(db: Db) {
   const policy = loadPolicy();
@@ -52,6 +75,7 @@ export function seedDatabase(db: Db) {
     if (!evaluation) throw new Error(`No evaluation for account ${seedCase.accountId}`);
 
     const values = {
+      ...CASE_DEFAULTS,
       ...seedCase,
       riskScore: evaluation.riskScore,
       triggeredRules: evaluation.triggeredRules,
@@ -61,10 +85,11 @@ export function seedDatabase(db: Db) {
     db.insert(cases).values(values).onConflictDoUpdate({ target: cases.id, set: values }).run();
   }
 
-  for (const approval of seedApprovals) {
+  for (const seedApproval of seedApprovals) {
+    const values = { ...APPROVAL_DEFAULTS, ...seedApproval };
     db.insert(approvals)
-      .values(approval)
-      .onConflictDoUpdate({ target: approvals.id, set: approval })
+      .values(values)
+      .onConflictDoUpdate({ target: approvals.id, set: values })
       .run();
   }
 
