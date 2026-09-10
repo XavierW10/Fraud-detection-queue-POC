@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
-import { claimCaseAction } from '@/app/actions';
+import { caseApi } from '@/api/client';
 import { CASE_STATUS_LABELS } from '@/components/labels';
 import { CASE_STATUSES } from '@/db/schema';
 import {
@@ -14,6 +15,7 @@ import {
 } from '@/queue/view';
 
 export function QueueTable({ rows, currentUserId }: { rows: QueueRow[]; currentUserId: string }) {
+  const router = useRouter();
   const [filters, setFilters] = useState<QueueFilters>(NO_FILTERS);
   const [failure, setFailure] = useState<{ id: string; message: string } | null>(null);
   const [claiming, startClaim] = useTransition();
@@ -34,8 +36,9 @@ export function QueueTable({ rows, currentUserId }: { rows: QueueRow[]; currentU
   const claim = (row: QueueRow) => {
     setFailure(null);
     startClaim(async () => {
-      const result = await claimCaseAction(row.id, row.version);
-      if (!result.ok) setFailure({ id: row.id, message: result.message });
+      const result = await caseApi.claim(row.id, row.version);
+      if (result.ok) router.refresh();
+      else setFailure({ id: row.id, message: result.message });
     });
   };
 
