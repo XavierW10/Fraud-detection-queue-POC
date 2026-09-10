@@ -11,7 +11,7 @@ let db: Db;
 function baseFixtures() {
   const reviewer = db
     .insert(users)
-    .values({ email: 'reviewer@example.com', role: 'reviewer' })
+    .values({ name: 'Test Reviewer', email: 'reviewer@example.com', role: 'reviewer' })
     .returning()
     .get();
   const account = db
@@ -86,8 +86,8 @@ describe('schema defaults', () => {
     ).toThrow(/CHECK constraint failed: accounts_status_check/);
     expect(() =>
       sqlite
-        .prepare('INSERT INTO users (id, email, role) VALUES (?, ?, ?)')
-        .run(crypto.randomUUID(), 'nobody@example.com', 'admin'),
+        .prepare('INSERT INTO users (id, name, email, role) VALUES (?, ?, ?, ?)')
+        .run(crypto.randomUUID(), 'Nobody', 'nobody@example.com', 'admin'),
     ).toThrow(/CHECK constraint failed: users_role_check/);
 
     // A nullable enum column still accepts null, but not an unknown value.

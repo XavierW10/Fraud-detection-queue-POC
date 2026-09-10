@@ -1,96 +1,90 @@
-import { getDb, runMigrations } from './client';
-import { accounts, transactions, users } from './schema';
+import { loadPolicy } from '@/policy/load';
+import { evaluateAccount, requiresSenior } from '@/rules/engine';
+import type { DeviceLink, EvaluationInput } from '@/rules/types';
+import type { Db } from './client';
+import {
+  seedAccounts,
+  seedApprovals,
+  seedAuditEvents,
+  seedCases,
+  seedTransactions,
+  seedUsers,
+} from './seed-data';
+import { accounts, approvals, auditEvents, cases, transactions, users } from './schema';
 
-const MINUTE = 60 * 1000;
-const HOUR = 60 * MINUTE;
+/**
+ * Loads the fixed demo dataset. Idempotent: every row has a literal id and is
+ * upserted, so running the seed twice leaves the same rows rather than
+ * duplicating them. `audit_events` is append-only, so existing rows are left
+ * alone instead of being rewritten.
+ */
+export function seedDatabase(db: Db) {
+  const policy = loadPolicy();
 
-function seed() {
-  const db = getDb();
-  runMigrations(db);
+  for (const user of seedUsers) {
+    db.insert(users).values(user).onConflictDoUpdate({ target: users.id, set: user }).run();
+  }
 
-  db.delete(transactions).run();
-  db.delete(accounts).run();
-  db.delete(users).run();
+  for (const account of seedAccounts) {
+    db.insert(accounts)
+      .values(account)
+      .onConflictDoUpdate({ target: accounts.id, set: account })
+      .run();
+  }
 
-  db.insert(users)
-    .values([
-      { email: 'reviewer@example.com', role: 'reviewer' },
-      { email: 'senior@example.com', role: 'senior' },
-    ])
-    .run();
+  for (const transaction of seedTransactions) {
+    db.insert(transactions)
+      .values(transaction)
+      .onConflictDoUpdate({ target: transactions.id, set: transaction })
+      .run();
+  }
 
-  const seeded = db
-    .insert(accounts)
-    .values([
-      { externalRef: 'ACC-1001', status: 'clear' },
-      { externalRef: 'ACC-1002', status: 'flagged' },
-      { externalRef: 'ACC-1003', status: 'under_review' },
-    ])
-    .returning()
-    .all();
+  const evaluations = new Map(
+    seedAccounts.map((account) => [
+      account.id,
+      evaluateAccount(evaluationInputFor(account.id), policy),
+    ]),
+  );
 
-  const [low, high, mid] = seeded;
-  const base = Date.now() - 2 * HOUR;
+  for (const seedCase of seedCases) {
+    const evaluation = evaluations.get(seedCase.accountId);
+    if (!evaluation) throw new Error(`No evaluation for account ${seedCase.accountId}`);
 
-  db.insert(transactions)
-    .values([
-      // Low-risk: small amounts, same device, same city.
-      {
-        accountId: low.id,
-        amount: 24.5,
-        timestamp: new Date(base),
-        latitude: 40.7128,
-        longitude: -74.006,
-        deviceId: 'device-low-1',
-      },
-      {
-        accountId: low.id,
-        amount: 61.0,
-        timestamp: new Date(base + 45 * MINUTE),
-        latitude: 40.7135,
-        longitude: -74.0021,
-        deviceId: 'device-low-1',
-      },
+    const values = {
+      ...seedCase,
+      riskScore: evaluation.riskScore,
+      triggeredRules: evaluation.triggeredRules,
+      requiresSenior: requiresSenior(evaluation.riskScore, policy),
+      policyVersion: `${policy.policyId}@${policy.policyVersion}`,
+    };
+    db.insert(cases).values(values).onConflictDoUpdate({ target: cases.id, set: values }).run();
+  }
 
-      // High-risk: high amount, impossible travel, burst velocity, new device.
-      {
-        accountId: high.id,
-        amount: 120.0,
-        timestamp: new Date(base),
-        latitude: 51.5072,
-        longitude: -0.1276,
-        deviceId: 'device-high-1',
-      },
-      {
-        accountId: high.id,
-        amount: 9800.0,
-        timestamp: new Date(base + 5 * MINUTE),
-        latitude: 51.5099,
-        longitude: -0.1337,
-        deviceId: 'device-high-1',
-      },
-      {
-        accountId: high.id,
-        amount: 4300.0,
-        timestamp: new Date(base + 12 * MINUTE),
-        latitude: 35.6762,
-        longitude: 139.6503,
-        deviceId: 'device-high-2',
-      },
+  for (const approval of seedApprovals) {
+    db.insert(approvals)
+      .values(approval)
+      .onConflictDoUpdate({ target: approvals.id, set: approval })
+      .run();
+  }
 
-      // Mid: moderate amount, single device.
-      {
-        accountId: mid.id,
-        amount: 780.0,
-        timestamp: new Date(base + 30 * MINUTE),
-        latitude: 48.8566,
-        longitude: 2.3522,
-        deviceId: 'device-mid-1',
-      },
-    ])
-    .run();
-
-  console.log('Seeded users, accounts and transactions.');
+  // Append-only: never rewrite an audit row that is already there.
+  db.insert(auditEvents).values(seedAuditEvents).onConflictDoNothing().run();
 }
 
-seed();
+/** Device usage on every account other than `accountId`, as the rules expect. */
+function evaluationInputFor(accountId: string): EvaluationInput {
+  const statuses = new Map(seedAccounts.map((account) => [account.id, account.status]));
+  const deviceLinks: DeviceLink[] = seedTransactions
+    .filter((tx) => tx.accountId !== accountId)
+    .map((tx) => {
+      const accountStatus = statuses.get(tx.accountId);
+      if (!accountStatus) throw new Error(`Transaction ${tx.id} has no seeded account`);
+      return { deviceId: tx.deviceId, accountId: tx.accountId, accountStatus };
+    });
+
+  return {
+    accountId,
+    transactions: seedTransactions.filter((tx) => tx.accountId === accountId),
+    deviceLinks,
+  };
+}
