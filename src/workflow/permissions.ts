@@ -65,10 +65,6 @@ const RULES: Record<WorkflowAction, (context: PermissionContext) => string | nul
   },
 };
 
-export function permits(action: WorkflowAction, context: PermissionContext): boolean {
-  return RULES[action](context) === null;
-}
-
 export function assertPermitted(action: WorkflowAction, context: PermissionContext): void {
   const refusal = RULES[action](context);
   if (refusal) throw new WorkflowError('forbidden', refusal);

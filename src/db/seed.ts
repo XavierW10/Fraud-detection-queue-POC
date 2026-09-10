@@ -1,4 +1,5 @@
 import { loadPolicy } from '@/policy/load';
+import { policyStamp } from '@/policy/schema';
 import { evaluateAccount, requiresSenior } from '@/rules/engine';
 import type { DeviceLink, EvaluationInput } from '@/rules/types';
 import type { Db } from './client';
@@ -55,7 +56,7 @@ export function seedDatabase(db: Db) {
       riskScore: evaluation.riskScore,
       triggeredRules: evaluation.triggeredRules,
       requiresSenior: requiresSenior(evaluation.riskScore, policy),
-      policyVersion: `${policy.policyId}@${policy.policyVersion}`,
+      policyVersion: policyStamp(policy),
     };
     db.insert(cases).values(values).onConflictDoUpdate({ target: cases.id, set: values }).run();
   }

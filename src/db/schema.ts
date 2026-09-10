@@ -181,4 +181,3 @@ export type Account = typeof accounts.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type Case = typeof cases.$inferSelect;
 export type Approval = typeof approvals.$inferSelect;
-export type AuditEvent = typeof auditEvents.$inferSelect;

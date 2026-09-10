@@ -14,8 +14,6 @@ export const CASE_TRANSITIONS: Record<CaseStatus, readonly CaseStatus[]> = {
   rejected: [],
 };
 
-export const CLOSED_CASE_STATUSES = ['approved', 'rejected'] as const satisfies CaseStatus[];
-
 export function isClosed(status: CaseStatus): boolean {
   return CASE_TRANSITIONS[status].length === 0;
 }
