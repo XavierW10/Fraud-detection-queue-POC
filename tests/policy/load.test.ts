@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadPolicy, parsePolicy } from '@/policy/load';
+import { loadPolicy, parsePolicy, PolicyError } from '@/policy/load';
 import { policyStamp } from '@/policy/schema';
 
 const VALID = `
@@ -28,37 +28,60 @@ rules:
       - known_bad
 `;
 
-function withPatch(patch: string) {
-  return VALID.replace('escalationThreshold: 60', patch);
-}
-
 describe('policy loading', () => {
-  it('loads and validates the repo policy file', () => {
+  it('loads the committed policy file', () => {
     const policy = loadPolicy();
-    expect(policy.policyId).toBe('aml-transaction-monitoring-policy');
-    expect(policy.name).toBe('AML Transaction Monitoring Policy');
-    expect(policy.policyVersion).toBe('1.0.0');
-    expect(policy.escalationThreshold).toBe(60);
-    expect(policy.rules.structuring.weight).toBe(45);
-    expect(policy.rules.geoImpossibility.weight).toBe(35);
-    expect(policy.rules.sharedDeviceLinkage.weight).toBe(40);
+
     expect(policyStamp(policy)).toBe('aml-transaction-monitoring-policy@1.0.0');
+    expect(policy.name).toBe('AML Transaction Monitoring Policy');
+    expect(policy.escalationThreshold).toBe(60);
+    expect([
+      policy.rules.structuring.weight,
+      policy.rules.geoImpossibility.weight,
+      policy.rules.sharedDeviceLinkage.weight,
+    ]).toEqual([45, 35, 40]);
   });
 
-  it('accepts a valid inline config', () => {
-    expect(parsePolicy(VALID).rules.geoImpossibility.maxKmPerHour).toBe(800);
+  it('fails clearly when the policy file is missing', () => {
+    expect(() => loadPolicy('/nonexistent/fraud-policy.yaml')).toThrow(PolicyError);
+    expect(() => loadPolicy('/nonexistent/fraud-policy.yaml')).toThrow(/cannot read policy file/);
   });
 
   it.each([
-    ['zero escalationThreshold', withPatch('escalationThreshold: 0')],
-    ['negative escalationThreshold', withPatch('escalationThreshold: -10')],
-    ['non-numeric escalationThreshold', withPatch('escalationThreshold: high')],
-    ['missing escalationThreshold', VALID.replace('escalationThreshold: 60\n', '')],
-    ['missing policyVersion', VALID.replace('policyVersion: 1.0.0\n', '')],
-    ['negative weight', VALID.replace('weight: 45', 'weight: -45')],
-    ['minAmount above maxAmount', VALID.replace('minAmount: 8000', 'minAmount: 12000')],
-    ['unknown linked account status', VALID.replace('- flagged', '- suspicious')],
-  ])('throws on %s', (_label, yaml) => {
-    expect(() => parsePolicy(yaml)).toThrow(/Invalid fraud policy/);
+    ['malformed YAML', 'policyId: [unterminated', /malformed YAML/],
+    [
+      'a duplicate rule id',
+      VALID.replace(
+        '  geoImpossibility:',
+        '  structuring: { enabled: false, weight: 1 }\n  geoImpossibility:',
+      ),
+      /malformed YAML/,
+    ],
+    [
+      'a missing rule',
+      VALID.replace(/  geoImpossibility:[\s\S]*?    earthRadiusKm: 6371\n/, ''),
+      /geoImpossibility/,
+    ],
+    ['an unknown rule id', VALID.replace('  structuring:', '  strukturing:'), /strukturing/],
+    [
+      'a non-positive threshold',
+      VALID.replace('escalationThreshold: 60', 'escalationThreshold: 0'),
+      /escalationThreshold/,
+    ],
+    [
+      'a non-numeric threshold',
+      VALID.replace('escalationThreshold: 60', 'escalationThreshold: high'),
+      /escalationThreshold/,
+    ],
+    ['a negative weight', VALID.replace('weight: 45', 'weight: -45'), /weight/],
+    [
+      'an unknown linked status',
+      VALID.replace('- flagged', '- suspicious'),
+      /linkedAccountStatuses/,
+    ],
+    ['an inverted amount band', VALID.replace('minAmount: 8000', 'minAmount: 12000'), /minAmount/],
+  ])('rejects %s', (_label, yaml, detail) => {
+    expect(() => parsePolicy(yaml)).toThrow(PolicyError);
+    expect(() => parsePolicy(yaml)).toThrow(detail);
   });
 });

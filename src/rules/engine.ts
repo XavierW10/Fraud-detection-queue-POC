@@ -15,13 +15,17 @@ export function evaluateAccount(input: EvaluationInput, policy: Policy): Evaluat
     sharedDeviceLinkageRule(input, policy.rules.sharedDeviceLinkage),
   ];
 
-  const riskScore = triggeredRules
-    .filter((outcome) => outcome.triggered)
-    .reduce((total, outcome) => total + outcome.weight, 0);
+  // Keyed by rule id so a rule contributes its weight at most once, however
+  // many times it matched within the account's transactions.
+  const scored = new Map(
+    triggeredRules.filter((outcome) => outcome.triggered).map((outcome) => [outcome.id, outcome]),
+  );
+  const riskScore = [...scored.values()].reduce((total, outcome) => total + outcome.weight, 0);
 
   return { riskScore, triggeredRules };
 }
 
+/** An account is flagged for senior review at or above the policy threshold. */
 export function requiresSenior(riskScore: number, policy: Policy): boolean {
   return riskScore >= policy.escalationThreshold;
 }

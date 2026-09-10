@@ -3,7 +3,7 @@ import { ACCOUNT_STATUSES } from '@/db/schema';
 
 const weight = z.number().positive();
 
-export const structuringRuleSchema = z.object({
+export const structuringRuleSchema = z.strictObject({
   enabled: z.boolean(),
   weight,
   minTransactions: z.number().int().min(2),
@@ -12,25 +12,26 @@ export const structuringRuleSchema = z.object({
   windowHours: z.number().positive(),
 });
 
-export const geoImpossibilityRuleSchema = z.object({
+export const geoImpossibilityRuleSchema = z.strictObject({
   enabled: z.boolean(),
   weight,
   maxKmPerHour: z.number().positive(),
   earthRadiusKm: z.number().positive(),
 });
 
-export const sharedDeviceLinkageRuleSchema = z.object({
+export const sharedDeviceLinkageRuleSchema = z.strictObject({
   enabled: z.boolean(),
   weight,
   linkedAccountStatuses: z.array(z.enum(ACCOUNT_STATUSES)).nonempty(),
 });
 
-export const policySchema = z.object({
+export const policySchema = z.strictObject({
   policyId: z.string().min(1),
   name: z.string().min(1),
   policyVersion: z.string().min(1),
   escalationThreshold: z.number().positive(),
-  rules: z.object({
+  /** Strict: an unknown rule key is a typo, not an extension point. */
+  rules: z.strictObject({
     structuring: structuringRuleSchema,
     geoImpossibility: geoImpossibilityRuleSchema,
     sharedDeviceLinkage: sharedDeviceLinkageRuleSchema,
