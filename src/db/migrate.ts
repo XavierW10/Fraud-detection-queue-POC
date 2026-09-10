@@ -1,4 +1,4 @@
-import { db, runMigrations } from './client';
+import { getDb, runMigrations } from './client';
 
-runMigrations(db);
+runMigrations(getDb());
 console.log('Migrations applied.');
