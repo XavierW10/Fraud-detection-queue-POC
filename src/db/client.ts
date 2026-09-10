@@ -8,6 +8,12 @@ import * as schema from './schema';
 export type Connection = ReturnType<typeof createDb>;
 export type Db = Connection['db'];
 
+/** The handle inside `db.transaction(...)`; interchangeable with `Db` for queries. */
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+
+/** Accepted by anything that must work both standalone and inside a transaction. */
+export type DbLike = Db | Tx;
+
 export function createDb(url: string) {
   if (url !== ':memory:') {
     fs.mkdirSync(path.dirname(url), { recursive: true });

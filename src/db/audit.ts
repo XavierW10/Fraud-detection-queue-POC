@@ -1,5 +1,5 @@
 import { eq, sql } from 'drizzle-orm';
-import type { Db } from './client';
+import type { DbLike } from './client';
 import { auditEvents } from './schema';
 
 /**
@@ -15,7 +15,7 @@ export type NewAuditEvent = {
   toStatus?: string | null;
 };
 
-export function insertAuditEvent(db: Db, event: NewAuditEvent) {
+export function insertAuditEvent(db: DbLike, event: NewAuditEvent) {
   return db
     .insert(auditEvents)
     .values({
@@ -29,7 +29,7 @@ export function insertAuditEvent(db: Db, event: NewAuditEvent) {
     .get();
 }
 
-export function listAuditEventsForCase(db: Db, caseId: string) {
+export function listAuditEventsForCase(db: DbLike, caseId: string) {
   return (
     db
       .select()
