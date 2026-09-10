@@ -52,6 +52,11 @@ export function createTestDb() {
   return { sqlite, db };
 }
 
+/** Where the application database lives; `:memory:` is honoured for tooling. */
+export function resolveDatabaseUrl(): string {
+  return process.env.DATABASE_URL ?? path.join(process.cwd(), 'data', 'app.db');
+}
+
 const globalForDb = globalThis as unknown as { __db?: Connection };
 
 /**
@@ -62,8 +67,7 @@ export function getConnection(): Connection {
   const existing = globalForDb.__db;
   if (existing) return existing;
 
-  const url = process.env.DATABASE_URL ?? path.join(process.cwd(), 'data', 'app.db');
-  const connection = createDb(url);
+  const connection = createDb(resolveDatabaseUrl());
   globalForDb.__db = connection;
   return connection;
 }

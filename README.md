@@ -28,8 +28,14 @@ npm run dev
 | `npm run db:generate` | generate a Drizzle migration from the schema    |
 | `npm run db:migrate`  | apply migrations                                |
 | `npm run db:seed`     | seed the fixed demo dataset (idempotent)        |
+| `npm run db:reset`    | delete the database, migrate and seed it again  |
 
 `DATABASE_URL` overrides the SQLite file path (default `./data/app.db`).
+
+Re-running `db:seed` restores every seeded row, including the columns the workflow writes — a
+case claimed during a demo goes back to unassigned and pending. It cannot remove what the demo
+_added_, though: audit events are append-only and new rows have ids the seed does not know. Use
+`db:reset` for a clean demo.
 
 ## Data model
 

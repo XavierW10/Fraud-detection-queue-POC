@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDb, type Db } from '@/db/client';
 import { seedDatabase } from '@/db/seed';
-import { ACCOUNT_IDS, CASE_IDS } from '@/db/seed-data';
+import { ACCOUNT_IDS, CASE_IDS, USER_IDS } from '@/db/seed-data';
 import { accounts, approvals, auditEvents, cases, transactions, users } from '@/db/schema';
 
 let sqlite: Database.Database;
@@ -42,6 +42,27 @@ describe('demo seed', () => {
 
     expect(rowCounts()).toEqual(before);
     expect(db.select().from(cases).all()).toEqual(snapshot);
+  });
+
+  it('restores a case the demo has already worked', () => {
+    const before = caseFor(CASE_IDS.clear);
+    expect(before.assignedTo).toBeNull();
+
+    db.update(cases)
+      .set({
+        status: 'approved',
+        assignedTo: USER_IDS.analyst,
+        resolution: 'approved',
+        rationale: 'Worked during the demo.',
+        resolvedAt: new Date(),
+        version: 9,
+      })
+      .where(eq(cases.id, CASE_IDS.clear))
+      .run();
+
+    seedDatabase(db);
+
+    expect(caseFor(CASE_IDS.clear)).toEqual(before);
   });
 
   it('demonstrates each rule, including one account over the threshold', () => {
