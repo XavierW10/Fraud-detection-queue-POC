@@ -1,9 +1,9 @@
-import { and, asc, desc, eq, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, type SQL } from 'drizzle-orm';
+import { listAuditEventsForCase } from '@/db/audit';
 import type { DbLike } from '@/db/client';
 import {
   accounts,
   approvals,
-  auditEvents,
   cases,
   transactions,
   users,
@@ -66,16 +66,7 @@ export function getCaseDetail(db: DbLike, caseId: string) {
       .orderBy(asc(transactions.timestamp))
       .all(),
     approvals: listApprovals(db, { caseId }),
-    auditEvents: db
-      .select({ event: auditEvents, actor: { id: users.id, name: users.name } })
-      .from(auditEvents)
-      .leftJoin(users, eq(auditEvents.actorId, users.id))
-      .where(eq(auditEvents.caseId, caseId))
-      // Insertion order: UUIDs do not sort chronologically.
-      .orderBy(sql`${auditEvents}.rowid`)
-      .all()
-      // A null actor is a system event, and stays null rather than becoming a user.
-      .map(({ event, actor }) => ({ ...event, actor })),
+    auditEvents: listAuditEventsForCase(db, caseId),
   };
 }
 

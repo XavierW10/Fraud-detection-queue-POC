@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm';
 import type { DbLike } from './client';
-import { auditEvents } from './schema';
+import { auditEvents, users } from './schema';
 
 /**
  * Access layer for the append-only audit trail: insert and read only.
@@ -32,11 +32,14 @@ export function insertAuditEvent(db: DbLike, event: NewAuditEvent) {
 export function listAuditEventsForCase(db: DbLike, caseId: string) {
   return (
     db
-      .select()
+      .select({ event: auditEvents, actor: { id: users.id, name: users.name } })
       .from(auditEvents)
+      .leftJoin(users, eq(auditEvents.actorId, users.id))
       .where(eq(auditEvents.caseId, caseId))
       // Insertion order: UUID primary keys do not sort chronologically.
-      .orderBy(sql`rowid`)
+      .orderBy(sql`${auditEvents}.rowid`)
       .all()
+      // A null actor is a system event, and stays null rather than becoming a user.
+      .map(({ event, actor }) => ({ ...event, actor }))
   );
 }
