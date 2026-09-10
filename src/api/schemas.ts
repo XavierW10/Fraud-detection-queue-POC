@@ -8,6 +8,10 @@ const reason = z.string().min(1);
 /** Ids are opaque strings; whether one exists is the database's answer, not a format's. */
 export const id = z.string().min(1);
 
+/** Page window, capped so a client cannot ask for the whole table at once. */
+export const limit = z.coerce.number().int().min(1).max(100).default(25);
+export const offset = z.coerce.number().int().min(0).default(0);
+
 export const caseParams = z.object({ caseId: id });
 export const approvalParams = z.object({ approvalId: id });
 

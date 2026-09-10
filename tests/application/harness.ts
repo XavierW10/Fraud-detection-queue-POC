@@ -35,14 +35,15 @@ const routes = {
   policy: () => import('@/app/api/policy/route'),
 };
 
-const request = (url = 'http://localhost') => new Request(url) as never;
+const request = (url = 'http://localhost', headers?: HeadersInit) =>
+  new Request(url, { headers }) as never;
 const body = (payload: unknown) =>
   new Request('http://localhost', { method: 'POST', body: JSON.stringify(payload) });
 const route = <T extends object>(params: T) => ({ params: Promise.resolve(params) }) as never;
 
 const result = async (response: Response): Promise<Result> => [
   response.status,
-  await response.json(),
+  response.status === 304 ? null : await response.json(),
 ];
 
 export const api = {
@@ -51,6 +52,15 @@ export const api = {
 
   case: async (caseId: string): Promise<Result> =>
     result(await (await routes.case()).GET(request(), route({ caseId }))),
+
+  /** The raw response, for the reads whose headers are the thing under test. */
+  raw: {
+    cases: async (query = '', headers?: HeadersInit): Promise<Response> =>
+      (await routes.cases()).GET(request(`http://localhost/api/cases${query}`, headers)),
+
+    case: async (caseId: string, headers?: HeadersInit): Promise<Response> =>
+      (await routes.case()).GET(request('http://localhost', headers), route({ caseId })),
+  },
 
   claim: async (caseId: string, expectedVersion: number): Promise<Result> =>
     result(await (await routes.claim()).POST(body({ expectedVersion }), route({ caseId }))),

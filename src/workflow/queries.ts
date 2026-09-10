@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, type SQL } from 'drizzle-orm';
 import { listAuditEventsForCase } from '@/db/audit';
 import type { DbLike } from '@/db/client';
 import {
@@ -25,25 +25,31 @@ export type CaseFilter = {
   requiresSenior?: boolean;
 };
 
-export function listCases(db: DbLike, filter: CaseFilter = {}) {
+/** A page of the queue is returned with the unpaged total, so the UI can show "n of m". */
+export function listCases(db: DbLike, filter: CaseFilter = {}, page = { limit: 50, offset: 0 }) {
   const conditions: SQL[] = [];
   if (filter.status) conditions.push(eq(cases.status, filter.status));
   if (filter.assignedTo) conditions.push(eq(cases.assignedTo, filter.assignedTo));
   if (filter.requiresSenior !== undefined) {
     conditions.push(eq(cases.requiresSenior, filter.requiresSenior));
   }
+  const where = conditions.length ? and(...conditions) : undefined;
 
-  return (
-    db
-      .select(caseColumns)
-      .from(cases)
-      .innerJoin(accounts, eq(cases.accountId, accounts.id))
-      .leftJoin(users, eq(cases.assignedTo, users.id))
-      .where(conditions.length ? and(...conditions) : undefined)
-      // Riskiest first, then oldest, so the queue reads top-down.
-      .orderBy(desc(cases.riskScore), asc(cases.createdAt))
-      .all()
-  );
+  const rows = db
+    .select(caseColumns)
+    .from(cases)
+    .innerJoin(accounts, eq(cases.accountId, accounts.id))
+    .leftJoin(users, eq(cases.assignedTo, users.id))
+    .where(where)
+    // Riskiest first, then oldest, then by id so paging never repeats or skips a row.
+    .orderBy(desc(cases.riskScore), asc(cases.createdAt), asc(cases.id))
+    .limit(page.limit)
+    .offset(page.offset)
+    .all();
+
+  const total = db.select({ value: count() }).from(cases).where(where).get()?.value ?? 0;
+
+  return { cases: rows, page: { ...page, total } };
 }
 
 /** Everything the case detail view shows, in one read. */

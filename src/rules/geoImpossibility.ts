@@ -1,5 +1,6 @@
 import type { GeoImpossibilityRule } from '@/policy/schema';
 import {
+  asEvidence,
   byTimestamp,
   RULE_IDS,
   type EvaluatedTransaction,
@@ -65,14 +66,21 @@ export function geoImpossibilityRule(
     };
   }
 
-  const speed = Number.isFinite(fastest.kmh)
-    ? `${round(fastest.kmh)} km/h`
-    : 'instantaneous travel';
+  const finite = Number.isFinite(fastest.kmh);
+  const speed = finite ? `${round(fastest.kmh)} km/h` : 'instantaneous travel';
   return {
     id,
     triggered: true,
     weight: rule.weight,
     reason: `${round(fastest.km)} km between ${fastest.from.timestamp.toISOString()} and ${fastest.to.timestamp.toISOString()} implies ${speed}, above ${rule.maxKmPerHour} km/h`,
+    evidence: {
+      kind: 'geo_impossibility',
+      from: asEvidence(fastest.from),
+      to: asEvidence(fastest.to),
+      distanceKm: round(fastest.km),
+      // Null rather than Infinity: the two transactions share a timestamp.
+      impliedKmPerHour: finite ? round(fastest.kmh) : null,
+    },
   };
 }
 
