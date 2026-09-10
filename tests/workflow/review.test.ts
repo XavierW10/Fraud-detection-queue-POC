@@ -4,7 +4,7 @@ import { beforeEach, afterEach, describe, expect, it } from 'vitest';
 import { resolveCurrentUser } from '@/auth/currentUser';
 import { listAuditEventsForCase } from '@/db/audit';
 import { createTestDb, type Db } from '@/db/client';
-import { accounts, approvals, cases, users, type Case, type User } from '@/db/schema';
+import { accounts, approvals, auditEvents, cases, users, type Case, type User } from '@/db/schema';
 import { WorkflowError } from '@/workflow/errors';
 import { claimCase, decideApproval, requestApproval, resolveCase } from '@/workflow/service';
 
@@ -35,6 +35,7 @@ function addCase(overrides: Partial<Case> = {}): Case {
 
 const reload = (id: string) => db.select().from(cases).where(eq(cases.id, id)).get()!;
 const actions = (id: string) => listAuditEventsForCase(db, id).map((event) => event.action);
+const auditRowCount = () => db.select().from(auditEvents).all().length;
 const accountStatus = (kase: Case) =>
   db.select().from(accounts).where(eq(accounts.id, kase.accountId)).get()!.status;
 
@@ -137,6 +138,8 @@ describe('direct resolution', () => {
         rationale: 'Mule account.',
       }),
     );
+    expect(reload(analystCase.id)).toEqual(analystCase);
+    expect(accountStatus(analystCase)).toBe('flagged');
 
     const seniorCase = claimed(true, senior);
     const closed = resolveCase(db, {
@@ -287,6 +290,57 @@ describe('senior decisions', () => {
 });
 
 describe('atomicity', () => {
+  it('records nothing when an action is refused', () => {
+    const belowThreshold = claimed(false);
+    const flagged = claimed(true);
+    const { case: escalated, approvalId } = awaitingApproval();
+    const before = auditRowCount();
+
+    // Forbidden, invalid input, stale version and an illegal transition alike.
+    failsWith('forbidden', () =>
+      resolveCase(db, {
+        caseId: flagged.id,
+        actor: analyst,
+        expectedVersion: flagged.version,
+        resolution: 'confirmed_fraud',
+        rationale: 'Mule account.',
+      }),
+    );
+    failsWith('invalid_input', () =>
+      decideApproval(db, {
+        approvalId,
+        actor: senior,
+        decision: 'approve',
+        reason: ' ',
+        expectedApprovalVersion: 1,
+        expectedCaseVersion: escalated.version,
+      }),
+    );
+    failsWith('conflict', () =>
+      resolveCase(db, {
+        caseId: belowThreshold.id,
+        actor: analyst,
+        expectedVersion: belowThreshold.version + 1,
+        resolution: 'approved',
+        rationale: 'Legitimate activity.',
+      }),
+    );
+    failsWith('invalid_transition', () =>
+      requestApproval(db, {
+        caseId: escalated.id,
+        actor: analyst,
+        expectedVersion: escalated.version,
+        recommendedResolution: 'reject',
+        requesterReason: 'Escalating twice.',
+      }),
+    );
+
+    expect(auditRowCount()).toBe(before);
+    expect(reload(belowThreshold.id)).toEqual(belowThreshold);
+    expect(reload(flagged.id)).toEqual(flagged);
+    expect(reload(escalated.id)).toEqual(escalated);
+  });
+
   it('rolls the record change back when its audit event fails', () => {
     const kase = claimed(false);
     sqlite.exec(`
