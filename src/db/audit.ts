@@ -1,6 +1,6 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { DbLike } from './client';
-import { auditEvents, users } from './schema';
+import { auditEvents, users, ACCOUNT_STATUSES, type AccountStatus } from './schema';
 
 /**
  * Access layer for the append-only audit trail: insert and read only.
@@ -27,6 +27,32 @@ export function insertAuditEvent(db: DbLike, event: NewAuditEvent) {
     })
     .returning()
     .get();
+}
+
+/**
+ * The status an account held before this case last moved it to `toStatus`.
+ * The trail is the record of where a status came from, so a change can be
+ * undone without a second column tracking it.
+ */
+export function statusBeforeChangeTo(
+  db: DbLike,
+  caseId: string,
+  toStatus: AccountStatus,
+): AccountStatus | null {
+  const previous = db
+    .select({ fromStatus: auditEvents.fromStatus })
+    .from(auditEvents)
+    .where(
+      and(
+        eq(auditEvents.caseId, caseId),
+        eq(auditEvents.action, 'account_status_change'),
+        eq(auditEvents.toStatus, toStatus),
+      ),
+    )
+    .orderBy(sql`${auditEvents}.rowid desc`)
+    .get();
+
+  return ACCOUNT_STATUSES.find((status) => status === previous?.fromStatus) ?? null;
 }
 
 export function listAuditEventsForCase(db: DbLike, caseId: string) {

@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3';
 import { eq } from 'drizzle-orm';
 import { createTestDb, type Db } from '@/db/client';
-import { accounts, cases, users, type Case, type User } from '@/db/schema';
+import { accounts, cases, users, type AccountStatus, type Case, type User } from '@/db/schema';
 import { seedDatabase } from '@/db/seed';
 import { USER_IDS } from '@/db/seed-data';
 
@@ -106,10 +106,10 @@ export function harnessFor(app: App) {
     actAs: (who: User): void => void (app.actor = who),
 
     /** A fresh above-threshold case, since every seeded flagged case is mid-flight. */
-    newFlaggedCase(externalRef: string): Case {
+    newFlaggedCase(externalRef: string, accountStatus: AccountStatus = 'flagged'): Case {
       const account = app.db
         .insert(accounts)
-        .values({ externalRef, status: 'flagged' })
+        .values({ externalRef, status: accountStatus })
         .returning()
         .get();
 

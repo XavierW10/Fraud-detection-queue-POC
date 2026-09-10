@@ -61,6 +61,13 @@ export function CaseActions({ kase, actor, pendingApproval }: Props) {
     startTransition(async () => {
       const outcome = await result;
       if (!outcome.ok) {
+        // A conflict means the versions on screen are stale, so retrying as-is
+        // could only fail again: re-read the case and keep the text to resubmit.
+        if (outcome.code === 'conflict') {
+          setError(`${outcome.message}. The case has been refreshed — review it and submit again.`);
+          router.refresh();
+          return;
+        }
         setError(outcome.message);
         return;
       }
@@ -130,7 +137,7 @@ export function CaseActions({ kase, actor, pendingApproval }: Props) {
       return Promise.resolve({
         ok: false,
         code: 'conflict',
-        message: 'The approval request is no longer pending. Reload the case.',
+        message: 'The approval request is no longer pending',
       });
     }
     return caseApi.decideApproval(pendingApproval.id, {
